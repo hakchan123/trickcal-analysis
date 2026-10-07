@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>게임 분석 — 트릭컬 리바이브의 재미요소와 그 작동 시스템</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    --paper:#F5F3FA; --card:#FFFFFF; --ink:#231F31; --ink-soft:#5A5470;
+    --rule:#DCD6E8; --shade:#EDE9F6;
+    --pure:#2F9A63; --calm:#3569CE; --mad:#D8413F; --lively:#D18A09; --gloom:#7244AC;
+    --key:#0E7F7A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#17141F; --card:#1F1B2B; --ink:#EDE9F6; --ink-soft:#A9A1C0;
+      --rule:#342D45; --shade:#262033;
+      --pure:#55C98A; --calm:#6E9DF5; --mad:#F2706D; --lively:#EFB13C; --gloom:#AE83E0; --key:#3BC2BA;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#17141F; --card:#1F1B2B; --ink:#EDE9F6; --ink-soft:#A9A1C0;
+    --rule:#342D45; --shade:#262033;
+    --pure:#55C98A; --calm:#6E9DF5; --mad:#F2706D; --lively:#EFB13C; --gloom:#AE83E0; --key:#3BC2BA;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    font-size:17px;line-height:1.75;letter-spacing:-.01em}
+  .wrap{max-width:720px;margin:0 auto;padding:0 20px}
+  h1,h2,h3{font-family:"Noto Serif KR",serif;letter-spacing:-.02em;line-height:1.32}
+
+  header{padding:56px 0 40px;border-bottom:1px solid var(--rule)}
+  .meta{font-size:13.5px;color:var(--ink-soft);margin:0 0 18px}
+  h1{font-size:clamp(27px,6.2vw,40px);font-weight:700;margin:0 0 14px}
+  .sub{font-size:16px;color:var(--ink-soft);margin:0;max-width:34em}
+
+  section{padding:46px 0;border-bottom:1px solid var(--rule)}
+  .kicker{font-size:13.5px;color:var(--key);margin:0 0 14px;font-weight:600}
+  h2{font-size:24px;margin:0 0 10px}
+  h3{font-size:19px;margin:30px 0 8px}
+  p{margin:0 0 16px}
+  strong{font-weight:600}
+  ul{margin:0 0 16px;padding-left:1.15em}
+  li{margin-bottom:8px}
+
+  .demo{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:22px;margin:32px 0 0}
+  .demo h2{font-size:17px;font-family:inherit;font-weight:600;margin:0 0 4px}
+  .demo p.hint{font-size:13.5px;color:var(--ink-soft);margin:0 0 16px}
+  .modes{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  .mode{appearance:none;font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;
+    padding:7px 14px;border-radius:999px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft)}
+  .mode[aria-pressed="true"]{background:var(--key);border-color:var(--key);color:#fff}
+  .mode:focus-visible{outline:3px solid var(--key);outline-offset:2px}
+  .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}
+  .slots.nine{grid-template-columns:repeat(9,1fr);gap:6px}
+  @media (max-width:520px){.slots{grid-template-columns:repeat(3,1fr)}.slots.nine{grid-template-columns:repeat(3,1fr);gap:8px}}
+  .slot{appearance:none;border:2px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);
+    color:var(--c);border-radius:11px;aspect-ratio:1/1.1;cursor:pointer;font-family:inherit;
+    font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:center;transition:background .12s ease}
+  .slots.nine .slot{font-size:12px}
+  .slot:hover{background:color-mix(in srgb,var(--c) 26%,transparent)}
+  .slot:focus-visible{outline:3px solid var(--key);outline-offset:2px}
+  .readout{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;padding-top:16px;border-top:1px solid var(--rule)}
+  .big{font-family:"Noto Serif KR",serif;font-size:36px;font-weight:700;line-height:1}
+  .readout .lab{font-size:14px;color:var(--ink-soft)}
+  .breakdown{font-size:14px;color:var(--ink-soft);margin:10px 0 0;min-height:1.6em}
+  .note{font-size:13.5px;color:var(--key);margin:6px 0 0;min-height:1.6em;font-weight:500}
+
+  .table-scroll{overflow-x:auto;margin:0 0 10px;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;min-width:460px;font-size:15px}
+  th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-weight:600;color:var(--ink-soft);font-size:13.5px}
+  td.num{font-variant-numeric:tabular-nums;font-weight:500}
+  tr.peak td{background:var(--shade)}
+  .cap{font-size:13.5px;color:var(--ink-soft);margin:0 0 26px}
+
+  figure{margin:0 0 24px}
+  svg{max-width:100%;height:auto;display:block}
+
+  .block{background:var(--card);border:1px solid var(--rule);border-radius:13px;padding:20px 22px;margin:0 0 16px}
+  .block h3{margin:0 0 4px;font-size:18px;color:var(--c,var(--ink))}
+  .block .where{font-size:13.5px;color:var(--ink-soft);margin:0 0 12px}
+  .block p:last-child{margin-bottom:0}
+
+  .pull{background:var(--shade);border-radius:12px;padding:20px 22px;margin:0 0 20px}
+  .pull p{margin:0;font-size:16.5px}
+
+  .tl{list-style:none;padding:0;margin:0}
+  .tl li{display:grid;grid-template-columns:96px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--rule);margin:0}
+  .tl li:last-child{border-bottom:0}
+  .tl .when{font-size:14px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .tl .what{margin:0;font-size:15.5px}
+  @media (max-width:430px){.tl li{grid-template-columns:1fr;gap:4px}}
+
+  footer{padding:40px 0 70px;font-size:14px;color:var(--ink-soft)}
+  footer h2{font-size:17px;color:var(--ink);margin-bottom:12px}
+  footer ol{padding-left:1.3em;margin:0 0 20px}
+  footer li{margin-bottom:6px}
+  a{color:var(--key)}
+  .sign{padding-top:18px;border-top:1px solid var(--rule)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="meta">포트폴리오 · 게임 분석 과제 — 재미요소 분석</p>
+  <h1>전투에 손을 못 대는 게임이<br>어떻게 '내가 이겼다'고 느끼게 하는가</h1>
+  <p class="sub">〈트릭컬 리바이브〉의 재미요소를 하나 짚고, 그것이 게임 안에서 어떤 시스템과 콘텐츠로 실제 작동하는지 추적한다.</p>
+
+  <div class="demo">
+    <h2>성격 시너지 계산기</h2>
+    <p class="hint">칸을 누르면 성격이 바뀝니다. 콘텐츠에 따라 편성 인원이 달라집니다.</p>
+    <div class="modes">
+      <button class="mode" id="m6" aria-pressed="true">6인 — 침략·던전</button>
+      <button class="mode" id="m9" aria-pressed="false">9인 — 차원 대충돌</button>
+    </div>
+    <div class="slots" id="slots"></div>
+    <div class="readout">
+      <span class="big" id="total">0%</span>
+      <span class="lab">덱 <strong>전원</strong>이 받는 HP·피해량 증가</span>
+    </div>
+    <p class="breakdown" id="breakdown"></p>
+    <p class="note" id="note"></p>
+  </div>
+</header>
+
+<section>
+  <p class="kicker">1. 전제</p>
+  <h2>자동 전투 게임이 안고 있는 문제</h2>
+  <p>〈트릭컬 리바이브〉는 에피드게임즈가 2023년 12월 출시한 모바일 수집형 RPG다. 세계수 아래의 세계 '엘리아스'에서 얼떨결에 교주가 된 플레이어가 100명이 넘는 '사도'를 모은다. 볼 당기기 같은 상호작용과 풀더빙 스토리를 내세운, 겉보기에 전형적인 캐주얼 서브컬처 게임이다.</p>
+  <p>그런데 <strong>전투가 전부 자동</strong>이다. 전투가 시작되면 플레이어는 지켜보기만 한다. 이 구조는 편하지만 치명적인 공백을 만든다. 이겨도 내가 이긴 것 같지 않다는 것이다. 조작으로 얻는 성취감이 없는 게임은 보통 "숫자가 높으면 이긴다"는 과금 경쟁으로 흘러가고, 그 순간 무과금 유저가 떠난다.</p>
+  <p>트릭컬은 이 공백을 다른 데서 메운다. 재미의 무게중심을 전투 중이 아니라 <strong>전투 직전으로</strong> 옮겨 놓았다.</p>
+</section>
+
+<section>
+  <p class="kicker">2. 재미요소</p>
+  <h2>이 게임의 재미요소: 편성이 곧 플레이다</h2>
+  <p>트릭컬에서 플레이어가 실제로 '플레이'하는 구간은 덱 편성 화면이다. 누구를 넣고 누구를 뺄지, 어느 열에 세울지를 고르는 그 1~2분이 이 게임의 본편이다. 전투는 그 판단의 채점 결과를 보여주는 재생 화면에 가깝다.</p>
+  <p>그래서 이 게임의 재미요소는 이렇게 정의할 수 있다.</p>
+  <div class="pull">
+    <p><strong>정답이 하나가 아닌 조합 문제를 풀고, 그 결과를 전투로 확인받는 재미.</strong> 승패의 원인이 과금액이 아니라 내 판단에 있다고 믿게 만드는 구조다.</p>
+  </div>
+  <p>말로만 두면 공허하다. 중요한 건 이 재미요소가 게임 안에서 어떤 장치로 구현되어 있느냐다. 그 핵심 장치가 <strong>성격 시너지 시스템</strong>이고, 그것이 여러 콘텐츠에 서로 다른 형태로 심어져 있다.</p>
+</section>
+
+<section>
+  <p class="kicker">3. 기반 규칙</p>
+  <h2>성격 시너지 — 조합 문제를 만드는 엔진</h2>
+  <p>사도는 순수·냉정·광기·활발·우울 다섯 성격 중 하나를 갖는다. 덱에 <strong>같은 성격이 2명 이상</strong> 모이면 시너지가 켜지고, 인원수가 특정 구간을 넘을 때마다 HP와 피해량 증가폭이 뛴다.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>같은 성격 인원</th><th>증가량</th><th>직전 구간 대비</th><th>도달 가능한 곳</th></tr></thead>
+    <tbody>
+      <tr><td class="num">2명</td><td class="num">20%</td><td class="num">—</td><td>모든 콘텐츠</td></tr>
+      <tr><td class="num">4명</td><td class="num">55%</td><td class="num">+35%p</td><td>모든 콘텐츠</td></tr>
+      <tr class="peak"><td class="num">6명</td><td class="num">100%</td><td class="num">+45%p</td><td>일반 6인 덱의 상한</td></tr>
+      <tr><td class="num">7명</td><td class="num">140%</td><td class="num">+40%p</td><td>성격 카드 사용 시</td></tr>
+      <tr><td class="num">9명</td><td class="num">200%</td><td class="num">+60%p</td><td>차원 대충돌·단기 속성반</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="cap">3명째와 5명째는 효과가 없다. 구간에 도달해야만 올라간다.</p>
+
+  <figure>
+    <svg viewBox="0 0 680 300" role="img" aria-label="같은 성격 인원수에 따른 증가량 곡선. 2명 20퍼센트, 4명 55퍼센트, 6명 100퍼센트, 7명 140퍼센트, 9명 200퍼센트.">
+      <g stroke="var(--rule)" stroke-width="1">
+        <line x1="56" y1="250" x2="660" y2="250"/><line x1="56" y1="190" x2="660" y2="190"/>
+        <line x1="56" y1="130" x2="660" y2="130"/><line x1="56" y1="70" x2="660" y2="70"/>
+        <line x1="56" y1="20" x2="660" y2="20"/>
+      </g>
+      <g fill="var(--ink-soft)" font-size="12" font-family="IBM Plex Sans KR, sans-serif">
+        <text x="12" y="254">0%</text><text x="6" y="194">50%</text>
+        <text x="0" y="134">100%</text><text x="0" y="74">150%</text><text x="0" y="24">200%</text>
+      </g>
+      <polyline fill="none" stroke="var(--key)" stroke-width="3" stroke-linejoin="round"
+        points="110,226 262,184 414,130 490,82 642,20"/>
+      <g fill="var(--key)">
+        <circle cx="110" cy="226" r="6"/><circle cx="262" cy="184" r="6"/>
+        <circle cx="414" cy="130" r="9"/><circle cx="490" cy="82" r="6"/><circle cx="642" cy="20" r="6"/>
+      </g>
+      <g fill="var(--ink)" font-size="13" font-weight="600" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif">
+        <text x="110" y="212">20</text><text x="262" y="170">55</text><text x="414" y="112">100</text>
+        <text x="490" y="68">140</text><text x="642" y="8">200</text>
+      </g>
+      <g fill="var(--ink-soft)" font-size="12.5" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif">
+        <text x="110" y="274">2명</text><text x="262" y="274">4명</text><text x="414" y="274">6명</text>
+        <text x="490" y="274">7명</text><text x="642" y="274">9명</text>
+      </g>
+      <text x="414" y="292" fill="var(--key)" font-size="12.5" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif">일반 덱의 상한</text>
+    </svg>
+  </figure>
+
+  <p>규칙에서 두 가지가 중요하다. 첫째, 증가 폭이 <strong>계단식</strong>이라 4명에서 멈춘 플레이어는 5번째를 넣어도 55% 그대로고 6번째를 채워야 100%가 된다. 둘째, 이 버프를 <strong>덱 전원</strong>이 받는다. 같은 성격 4명 + 다른 성격 2명이면 여섯 명 모두가 75%를 받는다. 다른 수집형 게임이 해당 속성에게만 버프를 주는 것과 다른 지점이다.</p>
+  <p>여기에 성격 상성이 얹힌다. 광기 → 순수 → 냉정 → 광기로 도는 삼각 구도에 활발 ↔ 우울이 서로를 때리는 구도가 붙는다. 유리한 쪽은 피해량 1.5배에 받는 피해 0.75배, PvP에서는 1.2배와 0.9배로 보정된다.</p>
+</section>
+
+<section>
+  <p class="kicker">4. 실제 작동</p>
+  <h2>이 규칙이 콘텐츠마다 다른 문제로 변형된다</h2>
+  <p>성격 시너지는 설정 화면에 적힌 수치가 아니라, 콘텐츠마다 다른 제약과 결합해 매번 새로운 조합 문제를 만든다. 같은 규칙이 어디서 어떻게 작동하는지 네 곳을 본다.</p>
+
+  <div class="block" style="--c:var(--pure)">
+    <h3>침략 · 던전 — 기본 루프</h3>
+    <p class="where">6인 편성 · 상한 100%</p>
+    <p>메인 스토리 진행과 재화 수급이 일어나는 일상 구간이다. 여기서 플레이어는 처음으로 "주력 성격 하나를 정한다"는 결정을 내린다. 6인 단일 성격이 가장 세다는 사실을 알게 되는 순간, 흩어져 있던 사도 목록이 <strong>6칸짜리 빈 칸</strong>으로 재편된다. 수집이 목록 채우기에서 퍼즐 맞추기로 바뀌는 전환점이 이곳이다.</p>
+    <p>동시에 배치 제약이 들어온다. 사도에는 전·중·후열과 탱커/딜러/서포터 역할이 따로 있다. "순수 6명"은 쉬워도 "전열이 버티고 후열이 딜을 넣는 순수 6명"은 어렵다. 성격이라는 가로축과 배치라는 세로축이 교차하면서 조합 문제의 난이도가 만들어진다.</p>
+  </div>
+
+  <div class="block" style="--c:var(--calm)">
+    <h3>차원 대충돌 — 시너지가 가장 노골적으로 드러나는 콘텐츠</h3>
+    <p class="where">9인 편성 · 상한 200% · 시즌제 레이드</p>
+    <p>이 콘텐츠를 대표 사례로 꼽는 이유는 네 가지 규칙이 전부 성격 시너지를 겨냥하고 있기 때문이다.</p>
+    <ul>
+      <li><strong>9인 편성.</strong> 일반 덱에서는 닿을 수 없는 200% 구간이 여기서만 열린다. 6인 덱으로 만족하던 플레이어에게 "같은 성격 9명"이라는 새 목표가 생긴다.</li>
+      <li><strong>패배한 덱의 사도는 재도전 불가.</strong> 한 덱으로 끝까지 밀 수 없으니 제2덱, 제3덱을 굴려야 한다. 주력 성격 하나만 키운 계정은 2덱부터 무너진다.</li>
+      <li><strong>시즌마다 보스의 성격이 교체된다.</strong> 릴1리·크르브르스 같은 보스가 시즌별로 다른 성격을 달고 나오므로, 이번 시즌에 유리한 성격이 다음 시즌에는 불리해진다. 한 성격만 키워서는 경쟁을 따라갈 수 없는 이유다.</li>
+      <li><strong>스펠 카드 사용 불가, 9명 중 6명만 고학년 스킬.</strong> 편성 외의 변수를 깎아내 조합 설계 자체의 비중을 끌어올린다.</li>
+    </ul>
+    <p>흥미로운 건 유저 측 결론이다. 커뮤니티 연구 결과, 9명을 억지로 같은 성격으로 채우며 성능이 낮은 1~2성 사도를 끼우느니 <strong>7+2 구성으로 타 성격 강캐를 용병으로 쓰는 편이 낫다</strong>는 평이 우세하다. 게임이 제시한 최댓값(200%)이 실제 최적해가 아니라는 것, 그 간극을 유저가 직접 계산해 찾아낸다는 것이 이 재미요소가 살아 있다는 증거다.</p>
+  </div>
+
+  <div class="block" style="--c:var(--mad)">
+    <h3>PVP — 상성이 작동하는 곳</h3>
+    <p class="where">공격덱·방어덱 분리 · 순위제</p>
+    <p>PVP에서는 공격덱과 방어덱을 따로 편성한다. 상대의 방어덱 성격을 보고 유리한 성격으로 카운터를 짜는, 가위바위보를 먼저 보고 내는 구조다. 공격에 실패해도 순위 페널티가 없기 때문에 플레이어는 부담 없이 여러 조합을 시험하게 된다. <strong>시행착오 비용을 낮춰 조합 실험을 장려하는</strong> 설계다.</p>
+    <p>여기서 단일 성격 덱의 약점이 드러난다. 100%를 완성해도 불리한 상성 앞에서는 무너진다. 완성이 곧 다음 결핍의 제시가 되는 순환이 이 지점에서 발생한다.</p>
+  </div>
+
+  <div class="block" style="--c:var(--gloom)">
+    <h3>심해 대격돌 — 구조를 콘텐츠로 못 박다</h3>
+    <p class="where">2026년 8월 추가 · 전 성격 덱 요구</p>
+    <p>순수부터 우울까지 모든 성격의 덱을 요구하는 콘텐츠다. 여러 성격을 키우라는 압력이 그동안 상성과 시즌 로테이션을 통해 간접적으로 작동했다면, 여기서는 아예 입장 조건이 되었다. 플레이어의 장기 목표가 "한 덱 완성"에서 "다섯 덱 완성"으로 확장되는 지점이고, 수집 동기의 유효기간을 몇 배로 늘리는 장치다.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">5. 정리</p>
+  <h2>재미요소 → 시스템 → 플레이어 행동</h2>
+  <p>앞의 내용을 하나의 표로 압축하면 이렇게 된다. 추상적인 '재미'가 각각 어떤 구현체를 통해 플레이어 행동으로 이어지는지가 분석의 핵심이다.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>느끼는 재미</th><th>작동 시스템</th><th>유발되는 행동</th></tr></thead>
+    <tbody>
+      <tr><td>모을 이유가 생긴다</td><td>6인 단일 성격 100% 보너스</td><td>주력 성격 선정, 빈 칸 추적</td></tr>
+      <tr><td>'한 명만 더'의 조바심</td><td>계단식 수치(3·5명째 효과 없음)</td><td>픽업 참여, 승급 투자</td></tr>
+      <tr><td>최애를 버리지 않아도 된다</td><td>버프의 덱 전원 적용(4+2 = 전원 75%)</td><td>애정 픽 2명 동반 편성</td></tr>
+      <tr><td>조합을 연구하는 재미</td><td>성격 × 전중후열 × 역할 교차 제약</td><td>커뮤니티 공략 소비·생산</td></tr>
+      <tr><td>완성해도 끝이 아니다</td><td>상성 보정, 대충돌 시즌 로테이션</td><td>2·3번째 성격 육성</td></tr>
+      <tr><td>최적해를 내가 찾았다</td><td>9인 200%와 7+2 실전 해법의 간극</td><td>계산·실험, 자기 효능감</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="cap">전투 조작이 없는 게임에서, 플레이어의 실력은 손이 아니라 이 표의 오른쪽 열로 측정된다.</p>
+</section>
+
+<section>
+  <p class="kicker">6. 한계</p>
+  <h2>강력한 시너지는 다양성을 먹는다</h2>
+  <p>6인 단일 성격이 압도적으로 유리하다는 말은, 뒤집으면 <strong>그 외의 조합이 전부 손해</strong>라는 뜻이다. 시너지가 강할수록 덱은 획일화되고 유저가 직접 짜는 즐거움은 줄어든다. 개발사도 이 문제를 인지하고 단계적으로 손을 댔다.</p>
+  <ul class="tl">
+    <li><span class="when">2024.02.01</span><p class="what">2성격 15%→20%, 4성격 40%→55%로 상향. 단일 덱의 우위는 남기면서 혼합 덱의 손해를 줄이는 조정이다.</p></li>
+    <li><span class="when">이후</span><p class="what">'공명' 성격 도입. 편성 전에 다섯 성격 중 하나를 골라 그 성격으로 취급되는 와일드카드이며, 덱에 <strong>두 명까지만</strong> 넣을 수 있다. 숨통은 틔워 주되 상한을 명시한 안전장치다.</p></li>
+    <li><span class="when">장기</span><p class="what">고성능 캐릭터 위주 구성이 유리해진 시기가 오면서, 시너지의 지배력 자체가 메타에 따라 오르내린다는 점이 드러났다. 차원 대충돌의 7+2 해법도 같은 맥락이다.</p></li>
+  </ul>
+  <p>부작용은 수치 밖에도 있다. 각 성격의 정원을 맞추려다 보니 캐릭터의 서사적 성격과 시스템상 성격이 어긋나는 사례가 생겼다. 베타에서 광기였던 엘레나가 정식 서비스에서 냉정으로 바뀐 것이 대표적이다. <strong>밸런스 요구가 캐릭터 설정을 침식하는 것</strong>은 수집형 게임 기획이 상시로 떠안는 비용이다.</p>
+</section>
+
+<section>
+  <p class="kicker">7. 결론</p>
+  <h2>가져갈 것</h2>
+  <p>성격 시너지는 "같은 색을 모으면 세진다"는 한 문장이다. 그런데 이 한 줄이 침략에서는 수집 목표가 되고, 차원 대충돌에서는 멀티덱 육성 압력이 되고, PVP에서는 상성 읽기 게임이 되고, 심해 대격돌에서는 입장 조건이 된다. 좋은 재미요소는 많은 기능이 아니라 <strong>여러 콘텐츠가 매달릴 수 있는 하나의 축</strong>이라는 뜻이다.</p>
+  <p>기획 관점에서 재사용할 수 있는 원리는 셋이다.</p>
+  <ul>
+    <li><strong>보상을 계단으로 끊어라.</strong> 어디서 끊느냐가 유저가 무엇을 간절히 원할지를 정한다.</li>
+    <li><strong>조건을 만족한 대상이 아니라 팀 전체에 보상하라.</strong> 효율과 애정이 정면충돌하지 않게 된다.</li>
+    <li><strong>같은 규칙을 콘텐츠마다 다른 제약과 묶어라.</strong> 새 시스템을 만드는 것보다 기존 축을 변주하는 편이 학습 비용 없이 깊이를 늘린다.</li>
+  </ul>
+</section>
+
+<footer>
+  <h2>참고 자료</h2>
+  <ol>
+    <li>나무위키, 「성격(트릭컬 리바이브)」 — 시너지 수치, 상성, 패치 이력 <a href="https://namu.wiki/w/%EC%84%B1%EA%B2%A9(%ED%8A%B8%EB%A6%AD%EC%BB%AC%20%EB%A6%AC%EB%B0%94%EC%9D%B4%EB%B8%8C)">바로가기</a></li>
+    <li>나무위키, 「트릭컬 리바이브/콘텐츠/차원 대충돌」 — 9인 편성, 시즌 규칙, 보스 성격 <a href="https://namu.wiki/w/%ED%8A%B8%EB%A6%AD%EC%BB%AC%20%EB%A6%AC%EB%B0%94%EC%9D%B4%EB%B8%8C/%EC%BD%98%ED%85%90%EC%B8%A0/%EC%B0%A8%EC%9B%90%20%EB%8C%80%EC%B6%A9%EB%8F%8C">바로가기</a></li>
+    <li>나무위키, 「트릭컬 리바이브/콘텐츠」 — PVP, 단기 속성반, 딜:리버리</li>
+    <li>나무위키, 「공명(트릭컬 리바이브)」 — 공명 성격의 편성 제한</li>
+    <li>Google Play 스토어, 「트릭컬 리바이브」 공식 소개 및 이용자 리뷰</li>
+    <li>위키백과, 「트릭컬 리바이브」 — 게임 개요 및 개발사 인터뷰 요약</li>
+  </ol>
+  <p class="sign">게임 분석 과제 · 재미요소 분석 — 트릭컬 리바이브</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var P=[{n:"순수",v:"--pure"},{n:"냉정",v:"--calm"},{n:"광기",v:"--mad"},
+         {n:"활발",v:"--lively"},{n:"우울",v:"--gloom"}];
+  var size=6, state=[0,0,0,0,1,2];
+  var wrap=document.getElementById("slots"),
+      totalEl=document.getElementById("total"),
+      bdEl=document.getElementById("breakdown"),
+      noteEl=document.getElementById("note"),
+      m6=document.getElementById("m6"), m9=document.getElementById("m9");
+
+  function buff(c){ if(c>=9)return 200; if(c>=7)return 140; if(c>=6)return 100; if(c>=4)return 55; if(c>=2)return 20; return 0; }
+
+  function setSize(n){
+    m6.setAttribute("aria-pressed", n===6?"true":"false");
+    m9.setAttribute("aria-pressed", n===9?"true":"false");
+    if(n>size){ while(state.length<n) state.push(0); }
+    else { state=state.slice(0,n); }
+    size=n; wrap.className = n===9 ? "slots nine" : "slots";
+    render();
+  }
+
+  function render(){
+    wrap.innerHTML="";
+    state.forEach(function(p,i){
+      var b=document.createElement("button");
+      b.className="slot"; b.style.setProperty("--c","var("+P[p].v+")");
+      b.textContent=P[p].n;
+      b.setAttribute("aria-label",(i+1)+"번 자리, 현재 "+P[p].n+". 누르면 다음 성격으로 바뀝니다.");
+      b.addEventListener("click",function(){ state[i]=(state[i]+1)%P.length; render(); });
+      wrap.appendChild(b);
+    });
+
+    var counts={},i;
+    for(i=0;i<state.length;i++) counts[state[i]]=(counts[state[i]]||0)+1;
+
+    var total=0, parts=[], near=null;
+    Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).forEach(function(k){
+      var c=counts[k], v=buff(c);
+      if(v>0) parts.push(P[k].n+" "+c+"명 "+v+"%");
+      total+=v;
+      if(c===3||c===5||c===8) near={name:P[k].n,c:c};
+    });
+
+    totalEl.textContent=total+"%";
+    bdEl.textContent = parts.length ? parts.join("  +  ") : "같은 성격이 2명 이상 모여야 시너지가 켜집니다.";
+
+    if(near){
+      noteEl.textContent = near.name+" "+near.c+"명 — 한 명을 더 넣기 전까지는 "+buff(near.c)+"% 그대로입니다.";
+    } else if(total===200){
+      noteEl.textContent = "단일 성격 9인. 차원 대충돌에서만 볼 수 있는 최대치입니다.";
+    } else if(total===100 && size===6){
+      noteEl.textContent = "단일 성격 6인. 일반 덱의 상한입니다.";
+    } else if(total===160){
+      noteEl.textContent = "7+2 조합. 대충돌에서 실전 해법으로 자주 쓰이는 구성입니다.";
+    } else if(total===75){
+      noteEl.textContent = "4+2 조합. 여섯 명 모두가 75%를 받습니다.";
+    } else {
+      noteEl.textContent="";
+    }
+  }
+
+  m6.addEventListener("click",function(){ setSize(6); });
+  m9.addEventListener("click",function(){ setSize(9); });
+  render();
+})();
+</script>
+</body>
+</html>
